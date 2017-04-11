@@ -1,0 +1,142 @@
+---
+title: "Assingment NYC Flight Data"
+author: "Michael Raminski"
+date: "April 8, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## NYC Flight Data
+
+Your job is to create a "rectangular" table useful for modeling from flight data. 
+In the folder `02-fundamentals/data` there are four CSV files: `flights.csv`, 
+`airports.csv`, `planes.csv` and `weather.csv`.  Join/merge these tables such 
+that there is one rectangular table with one row for each flight. 
+
+
+Put code in each of the sections provided.
+
+## 1. Read Data
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE, include=FALSE}
+library(readr)
+library(ggplot2)
+library(dplyr)
+library(data.table)
+```
+
+Using the `readr` package read the `flights` data.
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+flights <- read.csv("flights.csv")
+flights <- tbl_df(flights)
+flights
+```
+
+
+
+## Numeric Variables  
+
+Plot a histogram of arrival delays and departure delays 
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+#Arrival Delays Histogram (Base R)
+hist(flights$arr_delay,
+     freq=TRUE, 
+     breaks=30, 
+     border=NULL,
+     col="blue", 
+     xlab="Delay (minutes)", 
+     ylab="Count",
+     main="Distribution of Arrival Delays")
+
+#Arrival Delays Histogram (ggplot)
+ggplot(flights, aes(x=flights$arr_delay)) + 
+  geom_histogram(fill="blue", bins=30) +
+  labs(title="Distribution of Arrival Delays", x="Delay (minutes)", y="Count")
+
+
+#Departure Delays Histogram (Base R)
+hist(flights$dep_delay,
+     freq=TRUE, 
+     breaks=30, 
+     border=NULL,
+     col="blue", 
+     xlab="Delay (minutes)", 
+     ylab="Count",
+     main="Distribution of Departure Delays")
+
+#Departure Delays Histogram (ggplot)
+ggplot(flights, aes(x=flights$dep_delay)) + 
+  geom_histogram(fill="blue", bins=30) +
+  labs(title="Distribution of Departure Delays", x="Delay (minutes)", y="Count")
+```
+
+## Scatterplot
+
+Plot a scatterplot of date vs arrival delay 
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+#Create variable for the average arrival delay each day (approximate the day of the year)
+eachday <- group_by(flights,year,month,day)
+
+daydelay <- summarise(eachday,
+                          delay=mean(arr_delay,na.rm=TRUE),
+                          plotday=((mean(month)-1)*30)+mean(day))
+
+#Plot the average arrival delay by "date_hour" in Base R (linear regression line not working)
+plot(daydelay$plotday, daydelay$delay, 
+     col="purple",
+     main="Regression of Arrival Delay on Day of the Year",
+     xlab="Day",
+     ylab="Arrival Delay")
+abline(lm(daydelay$delay~daydelay$plotday), col="orange")
+
+#Plot the average arrival delay by "date_hour" in ggplot (linear regression line not appearing)
+ggplot(daydelay, aes(x=daydelay$plotday, y=daydelay$delay)) +
+  geom_point(pch=17, color="blue", size=2) +
+  geom_smooth(method="lm", color="red", linetype=2) +
+  labs(title="Regression of Arrival Delay on Day of the Year", x="Day", y="Arrival Delay")
+```
+
+
+
+## Create tables for Categorical Variables
+
+Create a `table`, counting the flights by origin airports and carrier.
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+#summarize the data by unique origin/carrier
+eachorigincarrier <- group_by(flights,origin,carrier)
+
+#Create variable for the count of unique origin/carriers
+eachorigincarrier <- summarise(eachorigincarrier,
+                          count=n())
+eachorigincarrier
+
+```
+
+
+## Join Data
+
+**Read** in the other data sets. Use methods to join the data together to create a single table containing one record per row.  (HINT: see `?data.table` or `?dplyr::join`)
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+#load data, and change first column name in "airports.csv" to "origin" from "faa". This will make the field names match, and the weather will be looked up based on the origin, not the destination, airport 
+airport <- read.csv("airports.csv")
+names(airport)[1] <- "origin"
+flights <- read.csv("flights.csv")
+planes <- read.csv("planes.csv")
+weather <- read.csv("weather.csv")
+
+#Merge data one set at a time until there is just one database "all"
+flightplanes <- data.table(flights,planes, by = "tailnum")
+flightplanesairport <- data.table(flightplanes,airport, by = "origin")
+all <- data.table(flightplanesairport,weather,by = c("origin","time_hour"))
+
+#Display summary of "all" database
+summary(all)
+```
