@@ -1,0 +1,169 @@
+---
+title: "NYCFlights: Arrival Delay Regression Model (Open Ended Variation)"
+author: "Michael Raminski"
+date: "April 16, 2017"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+# NYCFlights Model
+
+Using the rectangular data that you created last week create a model for `arr_delay`. Follow a well defined process for creating a model as discussed in class or from one of the readings. 
+
+Break the process down into steps and create a codeblock for each step. 
+ - Use as many steps you feel as necessary
+ - Concisely explain each step 
+ - Show all work
+ 
+(You can start with the data that you created last week.)
+
+
+## Step 1: Problem: Use the "flights" dataset, to build a linear model which finds the explanatory variables involved in late-arriving flights originating from NY
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE, include=FALSE}
+library(readr)
+library(ggplot2)
+library(plyr)
+library(dplyr)
+library(data.table)
+library(DSL)
+library(tibble)
+```
+
+## Step 2: Deliverable: R Markdown file
+
+## Step 2a: Import the dataset
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+flights <- read.csv("all.csv")
+flights <- tbl_df(flights)
+flights
+```
+
+## Step 3: Fix Data: remove non-predictor and disallowed variables
+
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+flights <- select(flights,-1,-12,-13,-20,-21,-30,-32,-38:-40,-53,-54)
+flights
+```
+
+## Step 4: Initial Tests: Fit Naive model, try other simple models
+####Look at simple statistics of delays for all flights in 2013 (total dataset)
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+summarise(flights,
+          Min_Delay = min(arr_delay, na.rm=TRUE),
+          Q1 = quantile(arr_delay, .25, na.rm=TRUE),
+          Average_Delay = mean(arr_delay, na.rm=TRUE),
+          Median_Delay = median(arr_delay, na.rm=TRUE),
+          Q3 = quantile(arr_delay, .75, na.rm=TRUE),
+          Max_Delay = max(arr_delay, na.rm=TRUE),
+          Stan_Dev = sd(arr_delay, na.rm=TRUE))
+```
+
+####Look at the median delay by month
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Jandelay <- summarise(filter(flights, month==1), Jan_Delay = median(arr_delay, na.rm=TRUE))
+Febdelay <- summarise(filter(flights, month==2), Feb_Delay = median(arr_delay, na.rm=TRUE))
+Mardelay <- summarise(filter(flights, month==3), Mar_Delay = median(arr_delay, na.rm=TRUE))
+Aprdelay <- summarise(filter(flights, month==4), Apr_Delay = median(arr_delay, na.rm=TRUE))
+Maydelay <- summarise(filter(flights, month==5), May_Delay = median(arr_delay, na.rm=TRUE))
+Jundelay <- summarise(filter(flights, month==6), Jun_Delay = median(arr_delay, na.rm=TRUE))
+Juldelay <- summarise(filter(flights, month==7), Jul_Delay = median(arr_delay, na.rm=TRUE))
+Augdelay <- summarise(filter(flights, month==8), Aug_Delay = median(arr_delay, na.rm=TRUE))
+Sepdelay <- summarise(filter(flights, month==9), Sep_Delay = median(arr_delay, na.rm=TRUE))
+Octdelay <- summarise(filter(flights, month==10), Oct_Delay = median(arr_delay, na.rm=TRUE))
+Novdelay <- summarise(filter(flights, month==11), Nov_Delay = median(arr_delay, na.rm=TRUE))
+Decdelay <- summarise(filter(flights, month==12), Dec_Delay = median(arr_delay, na.rm=TRUE))
+
+MonthlyMedianDelays <- data.frame(Jandelay, Febdelay, Mardelay, Aprdelay, Maydelay, Jundelay, Juldelay, Augdelay, Sepdelay, Octdelay, Novdelay, Decdelay)
+MonthlyMedianDelays
+```
+
+####Look at the delays for flights during rain versus flights not during rain (with ascending levels of rain)
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+MedDelayNoRain <- summarise(filter(flights, precip==0), NoRain_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayRain <- summarise(filter(flights, precip!=0), Rain_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayRain1 <- summarise(filter(flights, precip>0 & precip<.1), Rain1_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayRain2 <- summarise(filter(flights, precip>=.1 & precip<.2), Rain2_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayRain3 <- summarise(filter(flights, precip>=.2 & precip<.3), Rain3_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayRain4 <- summarise(filter(flights, precip>=.3), Rain4_Delay = median(arr_delay, na.rm=TRUE))
+
+RainMedianDelays <- data.frame(MedDelayNoRain, MedDelayRain, MedDelayRain1, MedDelayRain2, MedDelayRain3, MedDelayRain4)
+RainMedianDelays
+```
+
+####Look at the delays for flights based on ascending levels of wind gust
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+MedDelayNoWind <- summarise(filter(flights, wind_gust==0), NoWind_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayWind <- summarise(filter(flights, wind_gust!=0), Wind_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayWind1 <- summarise(filter(flights, wind_gust>0 & wind_gust<10), Wind1_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayWind2 <- summarise(filter(flights, wind_gust>=10 & wind_gust<20), Wind2_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayWind3 <- summarise(filter(flights, wind_gust>=20 & wind_gust<30), Wind3_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayWind4 <- summarise(filter(flights, wind_gust>=30), Wind4_Delay = median(arr_delay, na.rm=TRUE))
+
+WindMedianDelays <- data.frame(MedDelayNoWind, MedDelayWind, MedDelayWind1, MedDelayWind2, MedDelayWind3, MedDelayWind4)
+WindMedianDelays
+```
+
+####Look at the delays for flights based on ascending levels of visibility
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+MedDelayPartVis <- summarise(filter(flights, visib<10), PartVis_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayVis <- summarise(filter(flights, visib==10), Vis_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayVis1 <- summarise(filter(flights, visib>0 & visib<2.5), Vis1_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayVis2 <- summarise(filter(flights, visib>=2.5 & visib<5), Vis2_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayVis3 <- summarise(filter(flights, visib>=5 & visib<7.5), Vis3_Delay = median(arr_delay, na.rm=TRUE))
+MedDelayVis4 <- summarise(filter(flights, visib>=7.5), Vis4_Delay = median(arr_delay, na.rm=TRUE))
+
+VisMedianDelays <- data.frame(MedDelayPartVis, MedDelayVis, MedDelayVis1, MedDelayVis2, MedDelayVis3, MedDelayVis4)
+VisMedianDelays
+```
+
+######Preliminary observations:
+####Median Delay by Month: Biggest delays in December, then June and July. Least delays in September and May. Delays seems to be linked to cold/weather, major holiday travel, and busy travel seasons.
+######Median Delay by Rain: Delays showed some increase with the increase in rain fall
+######Median Delay by Wind: Delays were unchanged other than at the highest levels of gusts- delays increased
+######Median Delay by Visibility: Delays appear unchanged by visibility levels
+
+## Step 5: EDA
+####Run model with all potential eplanatory variables
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+lmall <- lm(arr_delay ~ month + dep_time + carrier + origin + air_time + year.1 + temp + dewp + humid + wind_speed + wind_gust + precip + pressure + visib, flights)
+summary(lmall)
+```
+
+####Remove the least significant variables (year of build, precipitation, and visibility)
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+lm2 <- lm(arr_delay ~ month + dep_time + carrier + origin + air_time + temp + dewp + humid + wind_speed + wind_gust + pressure, flights)
+summary(lm2)
+```
+
+####Remove the Wind Speed assuming it is redundant with Wind Gust
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+lm3 <- lm(arr_delay ~ month + dep_time + carrier + origin + air_time + temp + dewp + humid + wind_gust + pressure, flights)
+summary(lm3)
+```
+
+####Remove the Airline and Origin, assuming that these are siginificant because the delays are uniform across all airlines and airorts. This will, at the least, simplify the model
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+lm4 <- lm(arr_delay ~ month + dep_time + air_time + temp + dewp + humid + wind_gust + pressure, flights)
+summary(lm4)
+```
+
+
+
+
+# Question:
+
+Is this a good model?
+This is not a good model, the adjusted R-squared value is only around .06. Therefore, there is not a strong correlation between the predictor variables and arrival delays. Interestingly though, there are many significant variables among the predictors. 
+
+There are a few potential methods that could be attempted to improve the model. First, the variables that are not normally distributed (or closely normally distributed), could be centered and scaled. Additionally, because there are outlier values in the data (some delays of 500+ minutes), spacial sign could be used to reduce these values' distance from center. 
+
+
+
+
+
+
