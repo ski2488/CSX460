@@ -1,0 +1,252 @@
+---
+title: "NYCFlights: Arrival Delay Logictic Model"
+author: Michael Raminski
+date: May 1, 2017
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tibble)
+library(tibble)
+library(Hmisc)
+library(pastecs)
+library(reshape2)
+library(ggplot2)
+library(ggm)
+library(corrgram)
+library(psych)
+```
+
+
+## Logsitic and Inverse Logistic Transformation 
+
+- Write an R function for the logistic function. The function should accept a `numeric` vector with values `[-Inf,Inf]` and produce a numeric vector in the the range `[0,1]`.
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+logistic <- function(x){
+  return(1 / (1 + exp(-x)))}
+```
+
+- Plot the logistic function from  `[-10,10]`
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+curve(logistic, from = -10, to = 10, n = 10000)
+```
+
+- Write a R function for the inverse logistic function. The function should accept a `numeric` vector with values `[0,1]` and prodcuce a numeric vector in the range `[-Inf,Inf]`
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+logisticInv <- function(y){
+  return(log(y/(1-y)))}
+```
+
+- Plot the Inverse Logistic function from `[0,1]`
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+curve(logisticInv, from = 0, to = 1, n = 10000)
+```
+
+**Hint:** For plotting curves see `?graphics::curve` or `?ggplot2::stat_function`
+
+
+
+
+
+# NYCFlights Model
+
+Using the rectangular data that you created from the earlier assignment and following the example from the text and class, create a model for arr_delay >= 22 minutes. Describe/Explain each of the steps and show all work.
+
+
+
+
+
+####Step 1: Objective
+Use the merged NYC flights dataset to predict the likelihood of a 22 minute or greater delay, using a logistic regression model.
+
+The model will be selected by adding and subtracting parameters until the AIC is minimized. Then, the model performance will be judged by comparing it's probability of correctly predicting the outcome versus a naive model. 
+
+Deliverable: R Markdown files, html knitted file and .Rmd file, uploaded to Git.
+
+
+
+
+
+####Step 2: Read in Data and take a sample of 10,000 records as the training dataset
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+delays <- read.csv("all.csv")
+delays <- tbl_df(delays)
+
+delaystrain <- sample_n(delays,10000)
+delaystrain
+```
+
+
+
+
+
+####Step 3: Fix Data
+#####Add in column delay>=22 = 1, <22 = 0
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+delaystrain$delay22[delaystrain$arr_delay >= 22] <- 1
+delaystrain$delay22[delaystrain$arr_delay < 22] <- 0
+```
+
+
+
+
+
+####Step 4: Initial Tests
+#####Naive Model - Look at probability of 22+ minute delay (Probability ~ 19%)
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+summarise(delaystrain,
+          delay_perc = sum(delay22, na.rm=TRUE) / n())
+```
+
+
+
+
+
+####Step 5: Exploratory Analysis and Model Fitting
+#####Test simple model- only look at departure delay
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+delaylogistic1 <- glm(formula = delay22 ~ dep_delay, family = binomial, data = delaystrain)
+summary(delaylogistic1)
+```
+
+#####Include additional variables- add in other variables which were significant in the linear modeling exercise
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+delaylogistic2 <- glm(formula = delay22 ~ dep_delay + month, family = binomial, data = delaystrain)
+
+delaylogistic3 <- glm(formula = delay22 ~ dep_delay + month + air_time, family = binomial, data = delaystrain)
+
+delaylogistic4 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance, family = binomial, data = delaystrain)
+
+delaylogistic5 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time, family = binomial, data = delaystrain)
+
+delaylogistic6 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time + humid, family = binomial, data = delaystrain)
+
+delaylogistic7 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + dewp, family = binomial, data = delaystrain)
+
+delaylogistic8 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + dewp + temp, family = binomial, data = delaystrain)
+
+delaylogistic9 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + dewp + temp + pressure, family = binomial, data = delaystrain)
+
+delaylogistic10 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + dewp + temp + pressure + lat.y, family = binomial, data = delaystrain)
+
+delaylogistic11 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + dewp + temp + pressure + lat.y + wind_gust, family = binomial, data = delaystrain)
+
+delaylogistic12 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + dewp + temp + pressure + lat.y + wind_gust + carrier, family = binomial, data = delaystrain)
+```
+
+#####Compare models based on the AIC criterion
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+AIC(delaylogistic2, delaylogistic3, delaylogistic4, delaylogistic5, delaylogistic6, delaylogistic7, delaylogistic8, delaylogistic9, delaylogistic10, delaylogistic11, delaylogistic12)
+```
+
+#####AIC minimized at 12 variables and seems to be stabilized- look at summary of 12 variable model
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+delaylogistic12 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + dewp + temp + pressure + lat.y + wind_gust + carrier, family = binomial, data = delaystrain)
+summary(delaylogistic12)
+```
+
+#####Remove insignificant variables - remove "dewp" (least significant)
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+delaylogistic13 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + temp + pressure + lat.y + wind_gust + carrier, family = binomial, data = delaystrain)
+summary(delaylogistic13)
+```
+
+#####Create a test dataset of 10,000 values
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+delaystest <- sample_n(delays,10000)
+delaystest$delay22[delaystest$arr_delay >= 22] <- 1
+delaystest$delay22[delaystest$arr_delay < 22] <- 0
+delaystest
+```
+
+#####Apply logistic regression to test dataset
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+prob <- predict(delaylogistic13, delaystest, type="response")
+logit.pred <- factor(prob>.5, levels=c(FALSE,TRUE), labels=c(0,1))
+logit.pref <- table(delaystest$delay22, logit.pred, dnn=c("Actual", "Predicted"))
+logit.pref
+```
+
+#####Assess results
+#####Probability of correctly predicting a non-delay
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+logit.pref[1,1]/sum(logit.pref[1,])
+```
+
+#####Probability of correctly predicting a delay
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+logit.pref[2,2]/sum(logit.pref[2,])
+```
+
+#####Probability of correctly predicting result (overall)
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+(logit.pref[1,1] + logit.pref[2,2])/sum(logit.pref)
+```
+
+
+# Question:
+
+Is this a good model?
+This is a good model. In comparing the results to a Naive model:
+-The probability of correctly predicting a "non-delay" is improved from ~81% to ~98%
+-The probability of correctly predicting a "delay" is improved from ~19% to ~75%
+
+The logistic model has a total probability of predicting the correct outcome of ~94%.
+
+
+
+
+
+# PART B:
+
+Your model should be good at explaining tardiness. Now, assume that your job is to predict arrival delays a month in advance. You can no longer use all the features in your model. Retrain your model using only features that will be *known* only a month in advance of the departure time.  Show all steps as above.
+
+#####Create a new model, based on the previous model but eliminating all variables that aren't known one month in advance- departure delay and all variables relating to weather
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+delaylogistic14 <- glm(formula = delay22 ~ month + air_time + distance + dep_time + lat.y + carrier, family = binomial, data = delaystrain)
+summary(delaylogistic14)
+```
+
+#####Apply logistic regression to test dataset
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+prob2 <- predict(delaylogistic14, delaystest, type="response")
+logit.pred2 <- factor(prob2>.5, levels=c(FALSE,TRUE), labels=c(0,1))
+logit.pref2 <- table(delaystest$delay22, logit.pred2, dnn=c("Actual", "Predicted"))
+logit.pref2
+```
+
+#####Assess results
+#####Probability of correctly predicting a non-delay
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+logit.pref2[1,1]/sum(logit.pref2[1,])
+```
+
+#####Probability of correctly predicting a delay
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+logit.pref2[2,2]/sum(logit.pref2[2,])
+```
+
+#####Probability of correctly predicting result (overall)
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+(logit.pref2[1,1] + logit.pref2[2,2])/sum(logit.pref2)
+```
+
+
+
+
+
+# Question:
+
+Is this a good model?
+This is not a good model. In comparing the results to the original model:
+-The AIC has increased significantly
+-The probability of correctly predicting a "non-delay" is relatively unchanged (~98%)
+-The probability of correctly predicting a "delay" is decreased from ~75% to ~10%
+
+The logistic model now has a total probability of predicting the correct outcome of ~81%, and our probability of predicting a delay is actually lower than in the naive model.
+
+
+
