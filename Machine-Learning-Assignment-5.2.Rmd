@@ -1,0 +1,62 @@
+---
+title: "Resampling"
+author: "Michael Raminski"
+date: "May 9, 2017"
+output: html_document
+---
+
+**KNIT YOUR DOCUMENT AS *HTML* AND SUBMIT IT AND THE `Rmd` file**
+
+## Resampling
+
+`x` is a random variable. We want to not only know what the `mean(x)` is but want to calculate the uncertainty of `mean(x)`.  Measuring the uncertainty requires repeated measurements of `mean(x)`.
+
+- Calculate the mean of `x`.
+- Calculte the `sd( mean(x) )` using the **using 10-fold resampling**.  Create your own folds, show your work.
+- Calculte the `sd( mean(x) )` using the **using 10 bootstrap sample**.  Create your own folds, show your work. 
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tibble)
+library(tibble)
+library(Hmisc)
+library(pastecs)
+library(reshape2)
+library(ggplot2)
+library(ggm)
+library(corrgram)
+library(psych)
+``` 
+
+###Generate 20 random numbers
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+set.seed(1) 
+x <- runif(20,1,20)
+```
+
+###Mean of 20 random numbers
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+mean(x)
+```
+
+###Standard Deviation of mean(x) using 10-fold resampling 
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+df_cv <- data.frame(mean(x[-1:-2]),mean(x[-3:-4]),mean(x[-5:-6]),mean(x[-7:-8]),mean(x[-9:-10]),mean(x[-11:-12]),mean(x[-13:-14]),mean(x[-15:-16]),mean(x[-17:-18]),mean(x[-19:-20]))
+
+sd_cv <- sd(df_cv)
+```
+
+###Standard Deviation of mean(x) using 10 bootstrap sample
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+df_boot <- data.frame(mean(sample(x, 20, replace = TRUE)),mean(sample(x, 20, replace = TRUE)),mean(sample(x, 20, replace = TRUE)),mean(sample(x, 20, replace = TRUE)),mean(sample(x, 20, replace = TRUE)),mean(sample(x, 20, replace = TRUE)),mean(sample(x, 20, replace = TRUE)),mean(sample(x, 20, replace = TRUE)),mean(sample(x, 20, replace = TRUE)),mean(sample(x, 20, replace = TRUE)))
+
+sd_boot <- sd(df_boot)
+```
+
+
+### Your answers here: 
+
+- sd_cv   is: `r sd_cv`
+- sd_boot is: `r sd_boot`

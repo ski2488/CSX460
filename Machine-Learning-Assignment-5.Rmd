@@ -1,0 +1,193 @@
+---
+title: "Classification Mettrics"
+author: "Michael Raminski"
+date: "May 7, 2017"
+output: html_document
+---
+
+
+**KNIT YOUR DOCUMENT AS *HTML* AND SUBMIT IT AND THE `Rmd` file.** 
+ 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tibble)
+library(tibble)
+library(Hmisc)
+library(pastecs)
+library(reshape2)
+library(ggplot2)
+library(ggm)
+library(corrgram)
+library(psych)
+``` 
+
+## Classification Metrics Functions 
+Write functions of `y` and `y_hat` to calculate the following classification metrics
+
+
+####True Positive Rate
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+True_Positive_Rate <- function(y,y_hat){
+  return(sum(y == 1 & y_hat == 1, na.rm=TRUE) / sum(y == 1 & y_hat != "NA", na.rm=TRUE))}
+```
+
+####False Positive Rate
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+False_Positive_Rate <- function(y,y_hat){
+  return(sum(y == 0 & y_hat == 1, na.rm=TRUE) / sum(y == 0 & y_hat != "NA", na.rm=TRUE))}
+```
+
+####True Negative Rate
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+True_Negative_Rate <- function(y,y_hat){
+  return(sum(y == 0 & y_hat == 0, na.rm=TRUE) / sum(y == 0 & y_hat != "NA", na.rm=TRUE))}
+```
+
+####False Negative Rate
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+False_Negative_Rate <- function(y,y_hat){
+  return(sum(y == 1 & y_hat == 0, na.rm=TRUE) / sum(y == 1 & y_hat != "NA", na.rm=TRUE))}
+```
+
+####Sensitivity (True Positive Rate)
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Sensitivity <- function(y,y_hat){
+  return(True_Positive_Rate(y,y_hat))}
+```
+
+####Specificity (True Negative Rate)
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Specificity <- function(y,y_hat){
+  return(True_Negative_Rate(y,y_hat))}
+```
+
+####Recall (True Positive Rate)
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Recall <- function(y,y_hat){
+  return(True_Positive_Rate(y,y_hat))}
+```
+
+####Precision
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Precision <- function(y,y_hat){
+  return(sum(y == 1 & y_hat == 1, na.rm=TRUE) / sum(y_hat == 1 & y != "NA", na.rm=TRUE))}
+```
+
+####Prevalence
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Prevalence <- function(y,y_hat){
+  return(sum(y == 1, na.rm=TRUE) / sum(y != "NA", na.rm=TRUE))}
+```
+
+####Accuracy
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Accuracy <- function(y,y_hat){
+  return((sum(y == 1 & y_hat == 1, na.rm=TRUE) + sum(y == 0 & y_hat == 0, na.rm=TRUE)) / sum(y != "NA" & y_hat != "NA", na.rm=TRUE))}
+```
+
+####Kappa
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Kappa <- function(y,y_hat){
+  return(1-((1-Accuracy(y,y_hat))/
+              (1-(((sum(y == 1 & y_hat != "NA", na.rm=TRUE) / sum(y != "NA" & y_hat != "NA", na.rm=TRUE))*(sum(y_hat == 1 & y != "NA", na.rm=TRUE) / sum(y != "NA" & y_hat != "NA", na.rm=TRUE)))+
+                  ((sum(y == 0 & y_hat != "NA", na.rm=TRUE) / sum(y != "NA" & y_hat != "NA", na.rm=TRUE))*(sum(y_hat == 0 & y != "NA", na.rm=TRUE) / sum(y != "NA" & y_hat != "NA", na.rm=TRUE)))))))}
+```
+
+
+
+## Usage 
+Use the function(s) above to calculate the metrics for your late arrival model that
+you created last week. 
+
+####Load dataset and declare variables y and y_hat
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE, include=FALSE}
+delays <- read.csv("all.csv")
+delays <- tbl_df(delays)
+
+delaystrain <- sample_n(delays,10000)
+delaystrain
+
+delaystrain$delay22[delaystrain$arr_delay >= 22] <- 1
+delaystrain$delay22[delaystrain$arr_delay < 22] <- 0
+
+delaylogistic13 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + temp + pressure + lat.y + wind_gust + carrier, family = binomial, data = delaystrain)
+summary(delaylogistic13)
+
+delaystest <- sample_n(delays,10000)
+delaystest$delay22[delaystest$arr_delay >= 22] <- 1
+delaystest$delay22[delaystest$arr_delay < 22] <- 0
+delaystest
+
+prob <- predict(delaylogistic13, delaystest, type="response")
+logit.pred <- factor(prob>.5, levels=c(FALSE,TRUE), labels=c(0,1))
+logit.pref <- table(delaystest$delay22, logit.pred, dnn=c("Actual", "Predicted"))
+logit.pref
+
+delaystest$logit[logit.pred == 0] <- 0
+delaystest$logit[logit.pred == 1] <- 1
+
+
+y <- delaystest[,50]
+y
+
+y_hat <- delaystest[,51]
+y_hat
+```
+
+####True Positive Rate
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+True_Positive_Rate(y,y_hat)
+```
+
+####False Positive Rate
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+False_Positive_Rate(y,y_hat)
+```
+
+####True Negative Rate
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+True_Negative_Rate(y,y_hat)
+```
+
+####False Negative Rate
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+False_Negative_Rate(y,y_hat)
+```
+
+####Sensitivity
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Sensitivity(y,y_hat)
+```
+
+####Specificity
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Specificity(y,y_hat)
+```
+
+####Recall
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Recall(y,y_hat)
+```
+
+####Precision
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Precision(y,y_hat)
+```
+
+####Prevalence
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Prevalence(y,y_hat)
+```
+
+####Accuracy
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Accuracy(y,y_hat)
+```
+
+####Kappa
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+Kappa(y,y_hat)
+```
+
