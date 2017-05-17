@@ -1,0 +1,231 @@
+---
+title: "Caret / Recursive Partitioning"
+author: "Michael Raminski"
+date: "May 13, 2017"
+output: html_document
+---
+
+```{r init, warning=FALSE, echo=FALSE, message=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(readr)
+library(dplyr)
+library(tibble)
+library(tibble)
+library(Hmisc)
+library(pastecs)
+library(reshape2)
+library(ggplot2)
+library(ggm)
+library(corrgram)
+library(psych)
+library(rpart)
+library(rpart.plot)
+library(caret)
+library(pROC)
+```
+
+
+## Exercise 1: caret/logistic regression (5 points)
+
+Rebuild your logistic regression model from the previous week, this time using the `caret` package. 
+
+- Calculate the training or apparent performance of the model. 
+- Calculate an unbiased measure of performance 
+- Create a ROC Curve for your model
+
+Show all work.
+
+
+####Read in Data, add binary variable "delay22", select only relevant columns, omit all NA values
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+delays <- read.csv("all.csv")
+delays <- tbl_df(delays)
+delays$delay22[delays$arr_delay >= 22] <- 0
+delays$delay22[delays$arr_delay < 22] <- 1
+delays <- select(delays, c(2,4,6,10,15,16,20,22,25,27,45,50))
+delaysclean <- na.omit(delays)
+delaysclean
+```
+
+
+####Use createDataPartition to split 75% data into training dataset, 25% into test dataset
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+set.seed(99)
+inTraining <- caret::createDataPartition(delaysclean$month, p = .75, list = FALSE)
+training <- delaysclean[ inTraining,]
+testing  <- delaysclean[-inTraining,]
+training
+testing
+```
+
+
+####Calculate Training Model Performance
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+delaylogistic13 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + temp + lat.y + wind_gust + carrier, family = binomial, data = training)
+summary(delaylogistic13)
+
+prob <- predict(delaylogistic13, training, type="response")
+logit.pred <- factor(prob>.5, levels=c(FALSE,TRUE), labels=c(0,1))
+logit.pref <- table(training$delay22, logit.pred, dnn=c("Actual", "Predicted"))
+logit.pref
+
+training$logit[logit.pred == 0] <- 0
+training$logit[logit.pred == 1] <- 1
+
+ConfMatrix <- caret::confusionMatrix(training$logit, training$delay22)
+ConfMatrix
+```
+
+
+####Calculate Unbiased Measure of Performance - fit model to test dataset
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+delaylogistic14 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + temp + lat.y + wind_gust + carrier, family = binomial, data = testing)
+summary(delaylogistic14)
+
+prob2 <- predict(delaylogistic14, testing, type="response")
+logit.pred2 <- factor(prob2>.5, levels=c(FALSE,TRUE), labels=c(0,1))
+logit.pref2 <- table(testing$delay22, logit.pred2, dnn=c("Actual", "Predicted"))
+logit.pref2
+
+testing$logit[logit.pred2 == 0] <- 0
+testing$logit[logit.pred2 == 1] <- 1
+
+ConfMatrix2 <- caret::confusionMatrix(testing$logit, testing$delay22)
+ConfMatrix2
+```
+
+
+####Fit model to entire dataset
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+delaylogistic15 <- glm(formula = delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + temp + lat.y + wind_gust + carrier, family = binomial, data = delaysclean)
+summary(delaylogistic15)
+
+prob3 <- predict(delaylogistic15, delaysclean, type="response")
+logit.pred3 <- factor(prob3>.5, levels=c(FALSE,TRUE), labels=c(0,1))
+logit.pref3 <- table(delaysclean$delay22, logit.pred3, dnn=c("Actual", "Predicted"))
+logit.pref3
+
+delaysclean$logit[logit.pred3 == 0] <- 0
+delaysclean$logit[logit.pred3 == 1] <- 1
+
+ConfMatrix3 <- caret::confusionMatrix(delaysclean$logit, delaysclean$delay22)
+ConfMatrix3
+```
+
+
+####Create ROC Curve
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+ROCcurve <- roc(response = delaysclean$delay22, predictor = delaysclean$logit)
+plot(ROCcurve)
+auc(ROCcurve)
+```
+
+
+
+
+## Exercise 2: caret/rpart (5 points)
+
+Using the `caret` and `rpart` packages, create a **classification** model for flight delays using your NYC FLight data. Your solution should include:
+
+- The use of `caret` and `rpart` to train a model.
+- An articulation of the the problem your are 
+- An naive model
+- An unbiased calculation of the performance metric
+- A plot of your model -- (the actual tree; there are several ways to do this)
+- A discussion of your model 
+
+Show and describe all work
+
+####Problem to be Solved
+By experimenting with decision trees, we can find the predictor variables that best split the data. This can show important patterns in the data and potentially lead to classifying new variables that could produce a more predictive model. 
+
+
+
+
+####Naive Model
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+delay0 <- summarise(filter(delaysclean, dep_delay >= 0), Delay0 = sum(delay22 == 0)/sum(delay22 >= 0))
+delay5 <- summarise(filter(delaysclean, dep_delay >= 5), Delay5 = sum(delay22 == 0)/sum(delay22 >= 0))
+delay10 <- summarise(filter(delaysclean, dep_delay >= 10), Delay10 = sum(delay22 == 0)/sum(delay22 >= 0))
+delay15 <- summarise(filter(delaysclean, dep_delay >= 15), Delay15 = sum(delay22 == 0)/sum(delay22 >= 0))
+delay20 <- summarise(filter(delaysclean, dep_delay >= 20), Delay20 = sum(delay22 == 0)/sum(delay22 >= 0))
+delay25 <- summarise(filter(delaysclean, dep_delay >= 25), Delay25 = sum(delay22 == 0)/sum(delay22 >= 0))
+delay30 <- summarise(filter(delaysclean, dep_delay >= 30), Delay30 = sum(delay22 == 0)/sum(delay22 >= 0))
+delay35 <- summarise(filter(delaysclean, dep_delay >= 35), Delay35 = sum(delay22 == 0)/sum(delay22 >= 0))
+delay40 <- summarise(filter(delaysclean, dep_delay >= 40), Delay40 = sum(delay22 == 0)/sum(delay22 >= 0))
+delay45 <- summarise(filter(delaysclean, dep_delay >= 45), Delay45 = sum(delay22 == 0)/sum(delay22 >= 0))
+delay50 <- summarise(filter(delaysclean, dep_delay >= 50), Delay50 = sum(delay22 == 0)/sum(delay22 >= 0))
+
+Delay22Perc <- data.frame(delay0, delay5, delay10, delay15, delay20, delay25, delay30, delay35, delay40, delay45, delay50)
+Delay22Perc
+```
+
+
+####Calculate Training Model Performance
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+dtree <- rpart(delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + temp + lat.y + wind_gust + carrier, data = training, method="class",
+               parms=list(split="information"))
+print(dtree)
+plotcp(dtree)
+
+dtree.pred <- predict(dtree, training, type="class")
+
+training$logit2[dtree.pred == 0] <- 0
+training$logit2[dtree.pred == 1] <- 1
+
+ConfMatrix4 <- caret::confusionMatrix(training$logit2, training$delay22)
+ConfMatrix4
+```
+
+
+####Calculate Unbiased Measure of Performance
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+dtree2 <- rpart(delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + temp + lat.y + wind_gust + carrier, data = testing, method="class",
+               parms=list(split="information"))
+print(dtree2)
+plotcp(dtree2)
+
+dtree.pred2 <- predict(dtree2, testing, type="class")
+
+testing$logit2[dtree.pred2 == 0] <- 0
+testing$logit2[dtree.pred2 == 1] <- 1
+
+ConfMatrix5 <- caret::confusionMatrix(testing$logit2, testing$delay22)
+ConfMatrix5
+```
+
+
+####Fit model to entire dataset
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+dtree3 <- rpart(delay22 ~ dep_delay + month + air_time + distance + dep_time + humid + temp + lat.y + wind_gust + carrier, data = delaysclean, method="class",
+               parms=list(split="information"))
+print(dtree3)
+plotcp(dtree3)
+
+dtree.pred3 <- predict(dtree3, delaysclean, type="class")
+
+delaysclean$logit2[dtree.pred3 == 0] <- 0
+delaysclean$logit2[dtree.pred3 == 1] <- 1
+
+ConfMatrix6 <- caret::confusionMatrix(delaysclean$logit2, delaysclean$delay22)
+ConfMatrix6
+```
+
+
+####Plot Model
+```{r, warning=FALSE, message=FALSE, error=FALSE, eval=TRUE}
+prp(dtree3, type = 2, extra = 104,  
+    fallen.leaves = TRUE, main="Decision Tree")
+```
+
+
+####Discussion of Model
+- Discuss the difference between the models and why you would use one model over the other?
+Decision trees can at times overfit the data, but that isn't an issue here. The decision tree model is much simpler than the logistic model as it only splits the data by the departure delay (over/under 25 minutes). On the other hand, the logistic model uses a dozen variables to predict the outcome. However, when comparing the diagnostics between the two models, such as: accuracy, kappa, sensitivity and specificity, the logistic model appears to be superior.
+
+
+- How might you produce an ROC type curve for the *rpart* model? 
+In this case, the ROC curve could be produced by changing the cutoff of the departure delay. This would be similar to changing the threshold used in the logistic model, but we would instead move the minutes of the departure delay either up or down and assess the sensitivity/specificity tradeoff.
+
+
+
